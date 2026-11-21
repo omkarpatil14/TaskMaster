@@ -15,6 +15,14 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString));
 
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IUserRepository, Persistence.Repositories.UserRepository>();
+        services.AddScoped<ITaskRepository , Persistence.Repositories.TaskRepository>();
+        services.AddScoped<ITaskCompletionRepository , Persistence.Repositories.TaskCompletionRepository>();
+        services.AddScoped<IDailyMetricRepository, Persistence.Repositories.DailyMetricRepository>();
+
+        
+
         return services;
     }
 }
