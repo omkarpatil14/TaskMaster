@@ -23,7 +23,18 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [justCompleted, setJustCompleted] = useState<string | null>(null);
-  const [completedIds, setCompletedIds] = useState<Set<string>>(() => new Set());
+  const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const completedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of tasks) {
+      if (t.completedOnDate) ids.add(t.id);
+    }
+    for (const id of optimisticCompleted) ids.add(id);
+    return ids;
+  }, [tasks, optimisticCompleted]);
 
   const sorted = useMemo(
     () =>
@@ -67,13 +78,24 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
 
   function complete(taskId: string) {
     setError(null);
+    setOptimisticCompleted((prev) => new Set(prev).add(taskId));
+    setJustCompleted(taskId);
     startTransition(async () => {
       try {
-        await api.completeTask(token, taskId);
-        setJustCompleted(taskId);
-        setCompletedIds((prev) => new Set(prev).add(taskId));
+        await api.completeTask(token, taskId, todayIso());
         await onChanged();
+        setOptimisticCompleted((prev) => {
+          const next = new Set(prev);
+          next.delete(taskId);
+          return next;
+        });
       } catch (err) {
+        setOptimisticCompleted((prev) => {
+          const next = new Set(prev);
+          next.delete(taskId);
+          return next;
+        });
+        setJustCompleted(null);
         setError(err instanceof Error ? err.message : "Could not complete task");
       }
     });

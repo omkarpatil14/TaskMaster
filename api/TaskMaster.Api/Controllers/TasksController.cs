@@ -19,10 +19,14 @@ public class TasksController: ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<TaskResponse>>> List(CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<TaskResponse>>> List(
+        [FromQuery] DateOnly? date,
+        CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var result = await _taskService.ListActiveAsync(userId, cancellationToken);
+        // Prefer client local calendar day so completions match the heatmap "today"
+        var forDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var result = await _taskService.ListActiveAsync(userId, forDate, cancellationToken);
         return Ok(result);
     }
 
@@ -42,18 +46,21 @@ public class TasksController: ControllerBase
     }
 
     [HttpPost("{taskId:guid}/complete")]
-    public async Task<IActionResult> Complete(Guid taskId, [FromBody]CompleteTaskRequest? request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Complete(
+        Guid taskId,
+        [FromBody] CompleteTaskRequest? request,
+        CancellationToken cancellationToken)
     {
-        try{
+        try
+        {
             var userId = User.GetUserId();
-            var date = request?.Date?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var date = request?.Date ?? DateOnly.FromDateTime(DateTime.UtcNow);
             await _taskService.CompleteAsync(userId, taskId, date, cancellationToken);
             return NoContent();
-
         }
-        catch(InvalidOperationException ex)
+        catch (InvalidOperationException ex)
         {
-            return BadRequest(new { message = ex.Message});
+            return BadRequest(new { message = ex.Message });
         }
     }
 

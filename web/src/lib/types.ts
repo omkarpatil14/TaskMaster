@@ -18,6 +18,8 @@ export interface TaskItem {
   specificDate?: string | null;
   isActive: boolean;
   createdAtUtc: string;
+  /** Completed on the date requested when listing tasks (usually local today). */
+  completedOnDate?: boolean;
 }
 
 export interface CreateTaskRequest {

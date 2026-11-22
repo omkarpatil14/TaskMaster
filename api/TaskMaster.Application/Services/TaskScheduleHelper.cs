@@ -12,11 +12,19 @@ public static class TaskScheduleHelper
 
         return task.Type switch
         {
-            TaskType.oneDay => date == DateOnly.FromDateTime(task.CreatedAtUtc),
+            // CreatedAtUtc can fall on the previous local calendar day near midnight;
+            // accept create-day and the next UTC day so "one day" still shows as expected.
+            TaskType.oneDay => IsOneDayExpected(task, date),
             TaskType.SpecificDate => task.SpecificDate.HasValue && task.SpecificDate.Value == date,
             TaskType.Recurring => IsRecurringOn(task, date),
             _ => false
         };
+    }
+
+    private static bool IsOneDayExpected(TaskItem task, DateOnly date)
+    {
+        var created = DateOnly.FromDateTime(task.CreatedAtUtc);
+        return date == created || date == created.AddDays(1);
     }
 
     private static bool IsRecurringOn(TaskItem task, DateOnly date)

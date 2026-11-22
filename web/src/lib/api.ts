@@ -71,8 +71,11 @@ export const api = {
     });
   },
 
-  listTasks(token: string) {
-    return request<TaskItem[]>("/tasks", { token });
+  listTasks(token: string, date = todayIso()) {
+    return request<TaskItem[]>(
+      `/tasks?date=${encodeURIComponent(date)}`,
+      { token },
+    );
   },
 
   createTask(token: string, body: CreateTaskRequest) {
@@ -83,11 +86,11 @@ export const api = {
     });
   },
 
-  completeTask(token: string, taskId: string, date?: string) {
+  completeTask(token: string, taskId: string, date = todayIso()) {
     return request<void>(`/tasks/${taskId}/complete`, {
       method: "POST",
       token,
-      body: JSON.stringify(date ? { date } : {}),
+      body: JSON.stringify({ date }),
     });
   },
 

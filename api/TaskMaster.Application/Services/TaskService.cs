@@ -27,12 +27,12 @@ public class TaskService : ITaskService
 
     public async Task CompleteAsync(Guid userId, Guid taskId, DateOnly date, CancellationToken cancellationToken = default)
     {
-        var task = await _unitOfWork.Tasks.GetByIdAsync(userId, taskId,cancellationToken)
-         ?? throw new InvalidOperationException("Task not found");
+        var task = await _unitOfWork.Tasks.GetByIdAsync(userId, taskId, cancellationToken)
+            ?? throw new InvalidOperationException("Task not found");
 
-        var existing = await _unitOfWork.Completions.GetAsync(userId, taskId, date,cancellationToken);
+        var existing = await _unitOfWork.Completions.GetAsync(userId, taskId, date, cancellationToken);
 
-        if( existing is null)
+        if (existing is null)
         {
             await _unitOfWork.Completions.AddAsync(new TaskCompletion
             {
@@ -44,27 +44,31 @@ public class TaskService : ITaskService
                 CompletedAtUtc = DateTime.UtcNow,
                 CreatedAtUtc = DateTime.UtcNow
             }, cancellationToken);
-        }else{
+        }
+        else
+        {
             existing.Status = CompletionStatus.Completed;
             existing.CompletedAtUtc = DateTime.UtcNow;
         }
 
+        // Persist completion first so metric query sees it in the database
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         await UpsertDailyMetricAsync(userId, date, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-
-    private async Task UpsertDailyMetricAsync(Guid userId , DateOnly date, CancellationToken cancellationToken){
+    private async Task UpsertDailyMetricAsync(Guid userId, DateOnly date, CancellationToken cancellationToken)
+    {
         var tasks = await _unitOfWork.Tasks.GetActiveByUserAsync(userId, cancellationToken);
         var expected = tasks.Count(t => TaskScheduleHelper.IsExpectedOn(t, date));
 
         var completions = await _unitOfWork.Completions.GetByDateRangeAsync(userId, date, date, cancellationToken);
         var completed = completions.Count(c => c.Status == CompletionStatus.Completed);
 
-        var rate = expected == 0 ? 0 : Math.Round((decimal)completed / expected , 2);
+        var rate = expected == 0 ? 0 : Math.Round((decimal)completed / expected, 2);
 
         var metric = await _unitOfWork.DailyMetrics.GetByDateAsync(userId, date, cancellationToken);
-         if (metric is null)
+        if (metric is null)
         {
             await _unitOfWork.DailyMetrics.AddAsync(new DailyMetric
             {
@@ -117,28 +121,34 @@ public class TaskService : ITaskService
 
     }
 
-    public async Task<IReadOnlyList<TaskResponse>> ListActiveAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TaskResponse>> ListActiveAsync(Guid userId, DateOnly date, CancellationToken cancellationToken = default)
     {
-       var tasks = await _unitOfWork.Tasks.GetActiveByUserAsync(userId, cancellationToken);
-       return tasks.Select(Map).ToList();
+        var tasks = await _unitOfWork.Tasks.GetActiveByUserAsync(userId, cancellationToken);
+        var completions = await _unitOfWork.Completions.GetByDateRangeAsync(userId, date, date, cancellationToken);
+        var completedIds = completions
+            .Where(c => c.Status == CompletionStatus.Completed)
+            .Select(c => c.TaskId)
+            .ToHashSet();
 
+        return tasks.Select(t => Map(t, completedIds.Contains(t.Id))).ToList();
     }
 
     public async Task UncompleteAsync(Guid userId, Guid taskId, DateOnly date, CancellationToken cancellationToken = default)
     {
-        var existing = await _unitOfWork.Completions.GetAsync(userId, taskId, date,cancellationToken);
+        var existing = await _unitOfWork.Completions.GetAsync(userId, taskId, date, cancellationToken);
 
-        if(existing is null)
+        if (existing is null)
             return;
 
         existing.Status = CompletionStatus.Pending;
         existing.CompletedAtUtc = null;
 
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         await UpsertDailyMetricAsync(userId, date, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-     private static TaskResponse Map(TaskItem task) => new()
+    private static TaskResponse Map(TaskItem task, bool completedOnDate = false) => new()
     {
         Id = task.Id,
         Title = task.Title,
@@ -147,6 +157,7 @@ public class TaskService : ITaskService
         RecurrenceType = task.RecurrenceType,
         SpecificDate = task.SpecificDate,
         IsActive = task.IsActive,
-        CreatedAtUtc = task.CreatedAtUtc
+        CreatedAtUtc = task.CreatedAtUtc,
+        CompletedOnDate = completedOnDate
     };
 }
