@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: taskmaster-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__NeonConnection
+        sync: false
+      - key: Jwt__Issuer
+        value: TaskMaster
+      - key: Jwt__Audience
+        value: TaskMaster
+      - key: Jwt__Key
+        generateValue: true
+      - key: Jwt__ExpiryMinutes
+        value: "60"

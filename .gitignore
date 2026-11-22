@@ -1,0 +1,25 @@
+# .NET
+**/bin/
+**/obj/
+**/.vs/
+*.user
+*.suo
+**/appsettings.Development.json
+
+# Node / Next
+web/node_modules/
+web/.next/
+web/out/
+web/.env*.local
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Secrets
+.env
+.env.*
+!**/.env.example
