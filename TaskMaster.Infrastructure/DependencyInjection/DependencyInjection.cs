@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using TaskMaster.Application.Interfaces;
 using TaskMaster.Infrastructure.Persistence;
+using TaskMaster.Application.Services;
+using TaskMaster.Application.Interfaces.Services;
 namespace TaskMaster.Infrastructure.DependencyInjection;
 
 public static class DependencyInjection
@@ -20,9 +22,9 @@ public static class DependencyInjection
         services.AddScoped<ITaskRepository , Persistence.Repositories.TaskRepository>();
         services.AddScoped<ITaskCompletionRepository , Persistence.Repositories.TaskCompletionRepository>();
         services.AddScoped<IDailyMetricRepository, Persistence.Repositories.DailyMetricRepository>();
-
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
         
-
         return services;
     }
 }

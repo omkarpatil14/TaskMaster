@@ -12,9 +12,9 @@ public class UserRepository : IUserRepository
         this._db = db;
     }
 
-    public Task AddAsync(User user, CancellationToken cancellationToken = default)
+    public async Task AddAsync(User user, CancellationToken cancellationToken = default)
     {
-        return  _db.Users.FirstOrDefaultAsync(u => u.Id == user.Id, cancellationToken);
+        await _db.Users.AddAsync(user, cancellationToken);
     }
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
