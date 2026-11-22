@@ -73,8 +73,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-var frontendOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
-    ?? new[] { "http://localhost:3000", "http://127.0.0.1:3000" };
+// Prefer Cors__Origins on Render (comma-separated). Falls back to config array / localhost.
+var corsFromEnv = builder.Configuration["Cors:Origins"];
+var frontendOrigins = !string.IsNullOrWhiteSpace(corsFromEnv)
+    ? corsFromEnv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    : builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
+        ?? new[] { "http://localhost:3000", "http://127.0.0.1:3000" };
 
 builder.Services.AddCors(options =>
 {
