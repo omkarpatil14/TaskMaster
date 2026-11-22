@@ -36,7 +36,7 @@ export default function AppPage() {
       const from = daysAgoIso(rangeDays);
       const to = todayIso();
       const [taskList, heatmap] = await Promise.all([
-        api.listTasks(auth.accessToken),
+        api.listTasks(auth.accessToken, to),
         api.heatmap(auth.accessToken, from, to),
       ]);
       setTasks(taskList);

@@ -20,6 +20,8 @@ export interface TaskItem {
   createdAtUtc: string;
   /** Completed on the date requested when listing tasks (usually local today). */
   completedOnDate?: boolean;
+  /** PascalCase fallback if a proxy ever skips camelCase renaming. */
+  CompletedOnDate?: boolean;
 }
 
 export interface CreateTaskRequest {

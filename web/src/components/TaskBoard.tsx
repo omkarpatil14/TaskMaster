@@ -1,7 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { api, todayIso } from "@/lib/api";
+import {
+  isTaskCompletedOnDate,
+  markStoredComplete,
+  readStoredCompletions,
+  writeStoredCompletions,
+} from "@/lib/completions";
 import type { CreateTaskRequest, RecurrenceType, TaskItem, TaskType } from "@/lib/types";
 import { RECURRENCE_LABELS, TASK_TYPE_LABELS } from "@/lib/types";
 
@@ -23,18 +29,36 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [justCompleted, setJustCompleted] = useState<string | null>(null);
-  const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(
+  const [storedCompleted, setStoredCompleted] = useState<Set<string>>(
     () => new Set(),
   );
 
-  const completedIds = useMemo(() => {
-    const ids = new Set<string>();
+  useEffect(() => {
+    setStoredCompleted(readStoredCompletions());
+  }, []);
+
+  // Merge API flags into local storage so Done survives refresh even if the API is slow to catch up
+  useEffect(() => {
+    const fromApi = new Set<string>();
     for (const t of tasks) {
-      if (t.completedOnDate) ids.add(t.id);
+      if (isTaskCompletedOnDate(t)) fromApi.add(t.id);
     }
-    for (const id of optimisticCompleted) ids.add(id);
+    if (fromApi.size === 0) return;
+    setStoredCompleted((prev) => {
+      const next = new Set(prev);
+      for (const id of fromApi) next.add(id);
+      writeStoredCompletions(next);
+      return next;
+    });
+  }, [tasks]);
+
+  const completedIds = useMemo(() => {
+    const ids = new Set(storedCompleted);
+    for (const t of tasks) {
+      if (isTaskCompletedOnDate(t)) ids.add(t.id);
+    }
     return ids;
-  }, [tasks, optimisticCompleted]);
+  }, [tasks, storedCompleted]);
 
   const sorted = useMemo(
     () =>
@@ -78,21 +102,18 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
 
   function complete(taskId: string) {
     setError(null);
-    setOptimisticCompleted((prev) => new Set(prev).add(taskId));
+    const day = todayIso();
     setJustCompleted(taskId);
+    setStoredCompleted(markStoredComplete(taskId, day));
     startTransition(async () => {
       try {
-        await api.completeTask(token, taskId, todayIso());
+        await api.completeTask(token, taskId, day);
         await onChanged();
-        setOptimisticCompleted((prev) => {
-          const next = new Set(prev);
-          next.delete(taskId);
-          return next;
-        });
       } catch (err) {
-        setOptimisticCompleted((prev) => {
+        setStoredCompleted((prev) => {
           const next = new Set(prev);
           next.delete(taskId);
+          writeStoredCompletions(next, day);
           return next;
         });
         setJustCompleted(null);

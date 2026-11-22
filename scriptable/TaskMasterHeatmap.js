@@ -1,9 +1,9 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file.
-// icon-color: green; icon-glyph: chart-area;
+// icon-color: teal; icon-glyph: chart-area;
 //
 // TaskMaster Heatmap Widget
-// Light teal theme with paper texture + heatmap.
+// Dark fitness style — charcoal + neon teal accent.
 //
 // SETUP
 // 1. Create a new script in Scriptable, paste this whole file.
@@ -26,25 +26,25 @@ const CONFIG = {
   credit: "by Omkar Patil",
 };
 
-// Light productivity theme — soft paper + deep teal
+// Dark fitness theme — charcoal + neon teal (matches your reference widget)
 const COLORS = {
-  bg: new Color("#f3f5f7"),
-  card: new Color("#ffffff"),
-  ink: new Color("#101820"),
-  inkSoft: new Color("#4a5d6e"),
-  inkFaint: new Color("#7d8fa0"),
-  accent: new Color("#0c7a5f"),
-  accentMid: new Color("#14967a"),
-  accentSoft: new Color("#d9f3eb"),
-  accentGlow: new Color("#0c7a5f", 0.12),
-  border: new Color("#e2e8ee"),
-  track: new Color("#e8eef2"),
+  bg: new Color("#0e0e0e"),
+  card: new Color("#1a1a1a"),
+  ink: new Color("#ffffff"),
+  inkSoft: new Color("#c8c8c8"),
+  inkFaint: new Color("#8e8e93"),
+  accent: new Color("#2ee6c5"),
+  accentMid: new Color("#5ff0d4"),
+  accentSoft: new Color("#2ee6c5", 0.16),
+  accentGlow: new Color("#2ee6c5", 0.1),
+  border: new Color("#2c2c2e"),
+  track: new Color("#1a3330"),
   heat: [
-    new Color("#e6ecf1"),
-    new Color("#a8dccb"),
-    new Color("#4db897"),
-    new Color("#1a9474"),
-    new Color("#0a5f4a"),
+    new Color("#1a2826"),
+    new Color("#1f4f48"),
+    new Color("#1a8f7c"),
+    new Color("#1fc9a8"),
+    new Color("#2ee6c5"),
   ],
 };
 
@@ -370,48 +370,44 @@ function roundRect(ctx, rect, r, fill) {
   ctx.fillPath();
 }
 
-/** Soft paper texture + teal corner glow for a less flat background */
+/** Dark fitness texture — concentric rings + faint technical grid */
 function drawPaperTexture(width, height) {
   const ctx = new DrawContext();
   ctx.size = new Size(width, height);
   ctx.opaque = true;
   ctx.respectScreenScale = true;
 
-  // Base wash
-  ctx.setFillColor(new Color("#f5f7f9"));
+  ctx.setFillColor(new Color("#0e0e0e"));
   ctx.fillRect(new Rect(0, 0, width, height));
 
-  // Soft teal atmosphere (top-left + bottom-right)
-  ctx.setFillColor(new Color("#0c7a5f", 0.07));
-  ctx.fillEllipse(new Rect(-width * 0.15, -height * 0.35, width * 0.7, height * 0.9));
-  ctx.setFillColor(new Color("#0c7a5f", 0.05));
-  ctx.fillEllipse(new Rect(width * 0.45, height * 0.35, width * 0.7, height * 0.9));
+  // Soft teal glow behind content
+  ctx.setFillColor(new Color("#2ee6c5", 0.08));
+  ctx.fillEllipse(new Rect(-width * 0.2, -height * 0.4, width * 0.75, height * 1.1));
+  ctx.setFillColor(new Color("#2ee6c5", 0.04));
+  ctx.fillEllipse(new Rect(width * 0.45, height * 0.2, width * 0.7, height));
 
-  // Fine grid texture
-  ctx.setStrokeColor(new Color("#1a2a35", 0.045));
+  // Concentric ring watermark (fitness-style)
+  const cx = width * 0.22;
+  const cy = height * 0.5;
+  ctx.setStrokeColor(new Color("#ffffff", 0.05));
+  ctx.setLineWidth(1.5);
+  for (let r = 40; r < Math.max(width, height); r += 36) {
+    const path = new Path();
+    path.addEllipse(new Rect(cx - r, cy - r, r * 2, r * 2));
+    ctx.addPath(path);
+    ctx.strokePath();
+  }
+
+  // Fine technical lines
+  ctx.setStrokeColor(new Color("#ffffff", 0.03));
   ctx.setLineWidth(1);
-  const step = 18;
+  const step = 22;
   for (let x = 0; x <= width; x += step) {
     const path = new Path();
     path.move(new Point(x, 0));
     path.addLine(new Point(x, height));
     ctx.addPath(path);
     ctx.strokePath();
-  }
-  for (let y = 0; y <= height; y += step) {
-    const path = new Path();
-    path.move(new Point(0, y));
-    path.addLine(new Point(width, y));
-    ctx.addPath(path);
-    ctx.strokePath();
-  }
-
-  // Subtle dots
-  ctx.setFillColor(new Color("#0c7a5f", 0.06));
-  for (let y = 10; y < height; y += 28) {
-    for (let x = 10; x < width; x += 28) {
-      ctx.fillEllipse(new Rect(x, y, 2.5, 2.5));
-    }
   }
 
   return ctx.getImage();
@@ -563,17 +559,17 @@ function layoutMedium(w, days, stats) {
     s.centerAlignContent();
     s.setPadding(5, 8, 5, 8);
     s.cornerRadius = 8;
-    s.backgroundColor = accent ? COLORS.accentSoft : new Color("#ffffff", 0.92);
-    s.borderColor = accent ? new Color("#b8e5d6") : COLORS.border;
+    s.backgroundColor = accent ? COLORS.accentSoft : COLORS.card;
+    s.borderColor = accent ? new Color("#2ee6c5", 0.35) : COLORS.border;
     s.borderWidth = 1;
 
-    const l = s.addText(label + " ");
-    l.font = Font.mediumSystemFont(9);
-    l.textColor = COLORS.inkFaint;
+    const l = s.addText(label.toUpperCase() + " ");
+    l.font = Font.mediumSystemFont(8);
+    l.textColor = COLORS.ink;
 
     const v = s.addText(value);
     v.font = Font.boldSystemFont(12);
-    v.textColor = accent ? COLORS.accent : COLORS.ink;
+    v.textColor = accent ? COLORS.accent : COLORS.inkSoft;
   }
 
   chip("Today", `${stats.today.completed}/${stats.today.expected}`, true);
@@ -616,15 +612,15 @@ function layoutLarge(w, days, stats) {
     s.layoutVertically();
     s.setPadding(8, 10, 8, 10);
     s.cornerRadius = 10;
-    s.backgroundColor = accent ? COLORS.accentSoft : new Color("#ffffff", 0.92);
-    s.borderColor = accent ? new Color("#b8e5d6") : COLORS.border;
+    s.backgroundColor = accent ? COLORS.accentSoft : COLORS.card;
+    s.borderColor = accent ? new Color("#2ee6c5", 0.35) : COLORS.border;
     s.borderWidth = 1;
     const l = s.addText(label);
     l.font = Font.mediumSystemFont(8);
-    l.textColor = COLORS.inkFaint;
+    l.textColor = COLORS.ink;
     const v = s.addText(value);
     v.font = Font.boldSystemFont(14);
-    v.textColor = accent ? COLORS.accent : COLORS.ink;
+    v.textColor = accent ? COLORS.accent : COLORS.inkSoft;
   }
 
   tallChip("TODAY", `${stats.today.completed}/${stats.today.expected}`, true);

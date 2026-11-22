@@ -2,6 +2,6 @@ namespace TaskMaster.Application.DTOs.Tasks;
 
 public class CompleteTaskRequest
 {
-    /// <summary>If null, use today in UTC (or your chosen timezone later).</summary>
-    public DateOnly? Date { get; set; }
+    /// <summary>Local calendar day as yyyy-MM-dd. Prefer string so JSON binding is reliable.</summary>
+    public string? Date { get; set; }
 }

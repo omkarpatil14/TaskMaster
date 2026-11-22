@@ -20,12 +20,12 @@ public class TasksController: ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<TaskResponse>>> List(
-        [FromQuery] DateOnly? date,
+        [FromQuery] string? date,
         CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         // Prefer client local calendar day so completions match the heatmap "today"
-        var forDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var forDate = ParseDay(date) ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var result = await _taskService.ListActiveAsync(userId, forDate, cancellationToken);
         return Ok(result);
     }
@@ -54,7 +54,7 @@ public class TasksController: ControllerBase
         try
         {
             var userId = User.GetUserId();
-            var date = request?.Date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var date = ParseDay(request?.Date) ?? DateOnly.FromDateTime(DateTime.UtcNow);
             await _taskService.CompleteAsync(userId, taskId, date, cancellationToken);
             return NoContent();
         }
@@ -62,6 +62,12 @@ public class TasksController: ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+    }
+
+    private static DateOnly? ParseDay(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return DateOnly.TryParse(value.Trim(), out var day) ? day : null;
     }
 
     [HttpDelete("{taskId:guid}")]
