@@ -134,9 +134,11 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
     });
   }
 
+  const openCount = sorted.filter((t) => !completedIds.has(t.id)).length;
+
   return (
-    <section className="panel panel-accent rounded-2xl p-5 md:p-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 px-0.5">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-green">
             Execution
@@ -145,12 +147,14 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
             Tasks
           </h2>
         </div>
-        <p className="text-sm text-ink-soft">{sorted.length} active</p>
+        <p className="text-sm text-ink-soft">
+          {openCount} open · {sorted.length} active
+        </p>
       </div>
 
       <form
         onSubmit={submit}
-        className="mb-6 rounded-2xl border border-line bg-bg-elevated/60 p-4"
+        className="panel panel-accent rounded-2xl p-4 md:p-5"
         aria-label="Add task"
       >
         <div className="grid gap-3 md:grid-cols-[1.5fr_1fr_1fr_auto]">
@@ -259,15 +263,18 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
       </form>
 
       {error && (
-        <p className="mb-4 text-sm text-danger" role="alert">
+        <p
+          className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger"
+          role="alert"
+        >
           {error}
         </p>
       )}
 
       <ul className="space-y-2">
         {sorted.length === 0 && (
-          <li className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-ink-soft">
-            No active tasks yet. Add one and light up the heat map.
+          <li className="panel rounded-2xl border-dashed px-4 py-10 text-center text-ink-soft">
+            No active tasks yet. Add one above to start the day.
           </li>
         )}
 
@@ -276,7 +283,7 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
           return (
             <li
               key={task.id}
-              className={`flex flex-col gap-3 rounded-xl border border-line bg-bg-elevated/50 px-4 py-3.5 transition hover:border-line-strong sm:flex-row sm:items-center sm:justify-between ${
+              className={`panel flex flex-col gap-3 rounded-2xl px-4 py-3.5 transition hover:border-line-strong sm:flex-row sm:items-center sm:justify-between ${
                 done ? "opacity-70" : ""
               }`}
             >

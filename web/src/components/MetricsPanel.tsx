@@ -49,13 +49,13 @@ export function MetricsPanel({ days, tasks, today, rangeLabel }: Props) {
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 px-0.5">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-green">
             Analysis
           </p>
           <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight md:text-3xl">
-            Performance pulse
+            Performance
           </h2>
         </div>
         <p className="text-sm text-ink-soft">{rangeLabel}</p>
