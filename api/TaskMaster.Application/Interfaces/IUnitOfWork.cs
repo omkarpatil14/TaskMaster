@@ -7,5 +7,7 @@ public interface IUnitOfWork
     ITaskCompletionRepository Completions { get; }
     IDailyMetricRepository DailyMetrics { get; }
 
+    IRefreshTokenRepository RefreshTokens { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

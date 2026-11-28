@@ -12,7 +12,6 @@ import type { CreateTaskRequest, RecurrenceType, TaskItem, TaskType } from "@/li
 import { RECURRENCE_LABELS, TASK_TYPE_LABELS } from "@/lib/types";
 
 type Props = {
-  token: string;
   tasks: TaskItem[];
   onChanged: () => Promise<void>;
 };
@@ -20,7 +19,7 @@ type Props = {
 const fieldClass =
   "w-full rounded-xl border border-line bg-bg-elevated px-3 py-2.5 outline-none transition focus:border-green focus:ring-1 focus:ring-green/40";
 
-export function TaskBoard({ token, tasks, onChanged }: Props) {
+export function TaskBoard({ tasks, onChanged }: Props) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [type, setType] = useState<TaskType>(3);
@@ -91,7 +90,7 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
 
     startTransition(async () => {
       try {
-        await api.createTask(token, body);
+        await api.createTask(body);
         resetForm();
         await onChanged();
       } catch (err) {
@@ -107,7 +106,7 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
     setStoredCompleted(markStoredComplete(taskId, day));
     startTransition(async () => {
       try {
-        await api.completeTask(token, taskId, day);
+        await api.completeTask(taskId, day);
         await onChanged();
       } catch (err) {
         setStoredCompleted((prev) => {
@@ -126,7 +125,7 @@ export function TaskBoard({ token, tasks, onChanged }: Props) {
     setError(null);
     startTransition(async () => {
       try {
-        await api.archiveTask(token, taskId);
+        await api.archiveTask(taskId);
         await onChanged();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not archive task");

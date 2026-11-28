@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.AspNetCore.Identity;
 using TaskMaster.Application.DTOs.Auth;
 using TaskMaster.Application.Interfaces;
@@ -31,15 +32,77 @@ public class AuthService : IAuthService
        if(result == PasswordVerificationResult.Failed)
         throw new InvalidOperationException("Invalid email or password");
 
-        var (token, expires) = _jwtTokenService.CreateToken(user);
+        return await IssueTokensAsync(user, cancellationToken);
+
+     
+    }
+
+    public async Task LogoutAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        if(string.IsNullOrWhiteSpace(refreshToken)) return;
+
+        var stored  = await _unitOfWork.RefreshTokens.GetByHashAsync(
+            _jwtTokenService.HashToken(refreshToken),cancellationToken
+        );
+
+          if (stored is null || stored.RevokedAtUtc is not null) return;
+
+        stored.RevokedAtUtc = DateTime.UtcNow;
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+
+    }
+
+    public  async Task<AuthResponse> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        if(string.IsNullOrWhiteSpace(refreshToken))
+            throw new InvalidOperationException("refresh token is required");
+
+        var hash = _jwtTokenService.HashToken(refreshToken);
+        var temp = await _unitOfWork.RefreshTokens.GetByHashAsync(hash,cancellationToken)
+            ?? throw new InvalidOperationException("Invalid refresh token.");
+
+        if(temp.RevokedAtUtc is not null)
+        {
+                await _unitOfWork.RefreshTokens.RevokeAllForUserAsync(temp.UserId, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                throw new InvalidOperationException("Refresh token has been revoked.");
+        }
+
+         if (temp.ExpiresAtUtc <= DateTime.UtcNow)
+            throw new InvalidOperationException("Refresh token has expired.");
+
+        // ROTATION: the old token is single-use.
+        temp.RevokedAtUtc = DateTime.UtcNow;
+
+        return await IssueTokensAsync(temp.User, cancellationToken);
+    }
+
+    private async Task<AuthResponse> IssueTokensAsync(User user, CancellationToken cancellationToken)
+    {
+        var (accessToken, accessExpires) = _jwtTokenService.CreateToken(user);
+        var (refreshToken, refreshExpires) = _jwtTokenService.CreateRefreshToken();
+
+        await _unitOfWork.RefreshTokens.AddAsync(new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            TokenHash = _jwtTokenService.HashToken(refreshToken),   // store only the hash
+            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = refreshExpires
+        }, cancellationToken);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new AuthResponse
         {
-             UserId = user.Id,
+            UserId = user.Id,
             Email = user.Email,
             DisplayName = user.DisplayName,
-            AccessToken = token,
-            ExpiresAtUtc = expires
+            AccessToken = accessToken,
+            ExpiresAtUtc = accessExpires,
+            RefreshToken = refreshToken,                 // raw token goes to the client only once
+            RefreshTokenExpiresAtUtc = refreshExpires
         };
     }
 
@@ -69,15 +132,7 @@ public class AuthService : IAuthService
         await _unitOfWork.Users.AddAsync(user, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var (token , expires) = _jwtTokenService.CreateToken(user);
-
-        return new AuthResponse{
-            UserId = user.Id,
-            Email = user.Email,
-            DisplayName = user.DisplayName,
-            AccessToken = token,
-            ExpiresAtUtc = expires
-        };
+        return await IssueTokensAsync(user, cancellationToken);
 
     }
 }

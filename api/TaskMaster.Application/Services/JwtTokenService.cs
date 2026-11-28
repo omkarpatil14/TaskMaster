@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using TaskMaster.Application.Interfaces.Services;
 using TaskMaster.Domain.Entities;
+using System.Security.Cryptography;
 
 namespace TaskMaster.Application.Services;
 
@@ -18,6 +19,12 @@ public class JwtTokenService : IJwtTokenService
         _options = options.Value;
     }
 
+    public (string Token, DateTime ExpiresAtUtc) CreateRefreshToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(64);
+        var token = Convert.ToBase64String(bytes);
+        return (token, DateTime.UtcNow.AddDays(_options.RefreshTokenDays));
+    }
 
     public (string Token, DateTime ExpiresAtUtc) CreateToken(User user)
     {
@@ -41,5 +48,11 @@ public class JwtTokenService : IJwtTokenService
             signingCredentials: creds
         );
         return (new JwtSecurityTokenHandler().WriteToken(token),expires);
+    }
+
+    public string HashToken(string token)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexString(hash);   // 64 hex chars
     }
 }

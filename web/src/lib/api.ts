@@ -4,6 +4,14 @@ import type {
   HeatmapResponse,
   TaskItem,
 } from "./types";
+import {
+  accessTokenExpiring,
+  adoptSession,
+  clearSession,
+  getSession,
+  readStoredSession,
+  saveSession,
+} from "./session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/proxy";
 
@@ -27,12 +35,12 @@ async function parseError(res: Response): Promise<string> {
   return res.statusText || "Request failed";
 }
 
-async function request<T>(
-  path: string,
-  options: RequestInit & { token?: string | null } = {},
-): Promise<T> {
-  const { token, headers, ...rest } = options;
-  const res = await fetch(`${API_BASE}${path}`, {
+type RequestOptions = RequestInit & { auth?: boolean };
+
+async function send(path: string, options: RequestOptions, token: string | null) {
+  const { auth: _auth, headers, ...rest } = options;
+  void _auth;
+  return fetch(`${API_BASE}${path}`, {
     ...rest,
     headers: {
       "Content-Type": "application/json",
@@ -40,6 +48,34 @@ async function request<T>(
       ...headers,
     },
   });
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  let token: string | null = null;
+
+  if (options.auth) {
+    let session = getSession();
+    if (!session) throw new ApiError("Not signed in", 401);
+
+    // Refresh ahead of time so we don't burn a round-trip on a known-expired token.
+    if (accessTokenExpiring(session) && session.refreshToken) {
+      await refreshSession(session.accessToken);
+      session = getSession();
+      if (!session) throw new ApiError("Session expired", 401);
+    }
+    token = session.accessToken;
+  }
+
+  let res = await send(path, options, token);
+
+  // Access token rejected: rotate once and retry.
+  if (res.status === 401 && options.auth && token) {
+    const ok = await refreshSession(token);
+    const next = getSession();
+    if (ok && next) {
+      res = await send(path, options, next.accessToken);
+    }
+  }
 
   if (!res.ok) {
     throw new ApiError(await parseError(res), res.status);
@@ -50,6 +86,71 @@ async function request<T>(
   }
 
   return res.json() as Promise<T>;
+}
+
+// ─── Refresh-token rotation ─────────────────────────────────────────
+//
+// The API rotates refresh tokens (each is single-use) and treats re-use of a
+// revoked token as theft, revoking every token for the user. So concurrent
+// refreshes must collapse into one — within a tab (shared promise) and across
+// tabs (Web Locks + re-reading storage).
+
+let inFlight: Promise<boolean> | null = null;
+
+/**
+ * Refresh the session. `staleAccessToken` is the token that just failed/expired;
+ * if storage already holds a different one, another tab refreshed and we adopt it.
+ * Resolves true when a usable session is available afterwards.
+ */
+export function refreshSession(staleAccessToken: string): Promise<boolean> {
+  if (!inFlight) {
+    inFlight = withRefreshLock(() => doRefresh(staleAccessToken)).finally(() => {
+      inFlight = null;
+    });
+  }
+  return inFlight;
+}
+
+async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  if (typeof navigator !== "undefined" && navigator.locks?.request) {
+    return navigator.locks.request("taskmaster.refresh", fn) as Promise<T>;
+  }
+  return fn();
+}
+
+async function doRefresh(staleAccessToken: string): Promise<boolean> {
+  // Another tab may have rotated while we waited for the lock.
+  const stored = readStoredSession();
+  if (stored && stored.accessToken !== staleAccessToken && !accessTokenExpiring(stored)) {
+    adoptSession(stored);
+    return true;
+  }
+
+  const refreshToken = (stored ?? getSession())?.refreshToken;
+  if (!refreshToken) {
+    clearSession();
+    return false;
+  }
+
+  let res: Response;
+  try {
+    res = await send("/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken }),
+    }, null);
+  } catch {
+    // Network failure: keep the session, the caller will surface the error.
+    return false;
+  }
+
+  if (!res.ok) {
+    // 400/401 → token invalid, expired or revoked. Anything else (5xx) is transient.
+    if (res.status === 400 || res.status === 401) clearSession();
+    return false;
+  }
+
+  saveSession((await res.json()) as AuthResponse);
+  return true;
 }
 
 export const api = {
@@ -71,40 +172,53 @@ export const api = {
     });
   },
 
-  listTasks(token: string, date = todayIso()) {
+  /** Revokes the refresh token server-side. Best effort; never throws. */
+  async logout(refreshToken: string) {
+    try {
+      await send("/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken }),
+        keepalive: true,
+      }, null);
+    } catch {
+      /* ignore */
+    }
+  },
+
+  listTasks(date = todayIso()) {
     return request<TaskItem[]>(
       `/tasks?date=${encodeURIComponent(date)}`,
-      { token },
+      { auth: true },
     );
   },
 
-  createTask(token: string, body: CreateTaskRequest) {
+  createTask(body: CreateTaskRequest) {
     return request<TaskItem>("/tasks", {
       method: "POST",
-      token,
+      auth: true,
       body: JSON.stringify(body),
     });
   },
 
-  completeTask(token: string, taskId: string, date = todayIso()) {
+  completeTask(taskId: string, date = todayIso()) {
     return request<void>(`/tasks/${taskId}/complete`, {
       method: "POST",
-      token,
+      auth: true,
       body: JSON.stringify({ date }),
     });
   },
 
-  archiveTask(token: string, taskId: string) {
+  archiveTask(taskId: string) {
     return request<void>(`/tasks/${taskId}`, {
       method: "DELETE",
-      token,
+      auth: true,
     });
   },
 
-  heatmap(token: string, from: string, to: string) {
+  heatmap(from: string, to: string) {
     return request<HeatmapResponse>(
       `/metrics/heatmap?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-      { token },
+      { auth: true },
     );
   },
 };

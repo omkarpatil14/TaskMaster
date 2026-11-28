@@ -7,6 +7,8 @@ export interface AuthResponse {
   displayName: string;
   accessToken: string;
   expiresAtUtc: string;
+  refreshToken: string;
+  refreshTokenExpiresAtUtc: string;
 }
 
 export interface TaskItem {

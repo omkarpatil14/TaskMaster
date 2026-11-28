@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<TaskCompletion> TaskCompletions => Set<TaskCompletion>();
     public DbSet<DailyMetric> DailyMetrics => Set<DailyMetric>();
+    public DbSet<RefreshToken> RefreshToken => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,5 +67,20 @@ public class AppDbContext : DbContext
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_token");
+            entity.HasKey(x=>x.Id);
+            entity.Property(x=> x.TokenHash).HasMaxLength(128).IsRequired();
+            entity.HasIndex(x=> x.TokenHash).IsUnique();
+
+            entity.HasOne(x =>x.User)
+                .WithMany(x=> x.RefreshToken)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
+        );
     }
 }
