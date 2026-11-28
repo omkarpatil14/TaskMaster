@@ -9,4 +9,5 @@ public class JwtOptions
 
     public string Key {get; set;} = string.Empty;
     public int ExpiryMinutes { get; set; } = 60;
+    public int RefreshTokenDays { get; set; } = 30;
 }

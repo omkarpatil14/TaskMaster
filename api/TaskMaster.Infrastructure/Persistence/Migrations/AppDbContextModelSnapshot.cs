@@ -58,6 +58,39 @@ namespace TaskMaster.Infrastructure.Persistence.Migrations
                     b.ToTable("daily_metrics", (string)null);
                 });
 
+            modelBuilder.Entity("TaskMaster.Domain.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("refresh_token", (string)null);
+                });
+
             modelBuilder.Entity("TaskMaster.Domain.Entities.TaskCompletion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -184,6 +217,17 @@ namespace TaskMaster.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("TaskMaster.Domain.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("TaskMaster.Domain.Entities.User", "User")
+                        .WithMany("RefreshToken")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("TaskMaster.Domain.Entities.TaskCompletion", b =>
                 {
                     b.HasOne("TaskMaster.Domain.Entities.TaskItem", "Task")
@@ -214,6 +258,8 @@ namespace TaskMaster.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TaskMaster.Domain.Entities.User", b =>
                 {
                     b.Navigation("DailyMetrics");
+
+                    b.Navigation("RefreshToken");
 
                     b.Navigation("Tasks");
                 });

@@ -41,4 +41,25 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = ex.Message });
         }
     }   
+
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AuthResponse>> Refresh(RefreshRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _authService.RefreshAsync(request.RefreshToken, cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(RefreshRequest request, CancellationToken cancellationToken)
+    {
+        await _authService.LogoutAsync(request.RefreshToken, cancellationToken);
+        return NoContent();
+    }
 }

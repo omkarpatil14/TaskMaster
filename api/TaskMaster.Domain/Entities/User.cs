@@ -10,4 +10,5 @@ public DateTime? UpdatedAtUtc {get; set;}
 
 public ICollection<TaskItem> Tasks {get; set;} = new List<TaskItem>();
 public ICollection<DailyMetric> DailyMetrics {get;set;} = new List<DailyMetric>();
+public ICollection<RefreshToken> RefreshToken {get; set;} = new List<RefreshToken>();
 }

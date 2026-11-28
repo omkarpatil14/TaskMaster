@@ -72,8 +72,8 @@ export default function AppPage() {
       const from = daysAgoIso(rangeDays);
       const to = todayIso();
       const [taskList, heatmap] = await Promise.all([
-        api.listTasks(auth.accessToken, to),
-        api.heatmap(auth.accessToken, from, to),
+        api.listTasks(to),
+        api.heatmap(from, to),
       ]);
       setTasks(taskList);
       setDays(heatmap.days);
@@ -236,7 +236,6 @@ export default function AppPage() {
 
           {section === "tasks" && (
             <TaskBoard
-              token={auth.accessToken}
               tasks={tasks}
               onChanged={refresh}
             />

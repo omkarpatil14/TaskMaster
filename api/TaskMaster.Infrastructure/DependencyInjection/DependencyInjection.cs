@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<IMetricsService, MetricsService>();
+        services.AddScoped<IRefreshTokenRepository, Persistence.Repositories.RefreshTokenRepository>();
                 
         return services;
     }

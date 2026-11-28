@@ -8,16 +8,28 @@ import {
   useMemo,
   useState,
 } from "react";
+import { api } from "./api";
+import {
+  SESSION_STORAGE_KEY,
+  adoptSession,
+  clearSession,
+  getSession,
+  loadSession,
+  readStoredSession,
+  saveSession,
+  subscribeSession,
+  type Session,
+} from "./session";
 import type { AuthResponse } from "./types";
 
-const STORAGE_KEY = "taskmaster.auth";
-
+/**
+ * Only the user's identity lives in React state. Tokens stay in the session
+ * store so a silent refresh doesn't re-render (and refetch) the whole app.
+ */
 type AuthState = {
   userId: string;
   email: string;
   displayName: string;
-  accessToken: string;
-  expiresAtUtc: string;
 } | null;
 
 type AuthContextValue = {
@@ -29,15 +41,8 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function readStorage(): AuthState {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as AuthState;
-  } catch {
-    return null;
-  }
+function toIdentity(s: Session | null): AuthState {
+  return s ? { userId: s.userId, email: s.email, displayName: s.displayName } : null;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -45,34 +50,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = readStorage();
-    if (stored?.expiresAtUtc) {
-      const expired = new Date(stored.expiresAtUtc).getTime() <= Date.now();
-      if (expired) {
-        localStorage.removeItem(STORAGE_KEY);
-        setAuth(null);
-      } else {
-        setAuth(stored);
-      }
-    }
+    setAuth(toIdentity(loadSession()));
     setReady(true);
+
+    // Keep identity stable across token rotations; only change on sign-in/out.
+    const unsubscribe = subscribeSession((s) => {
+      setAuth((prev) => {
+        const next = toIdentity(s);
+        if (
+          prev &&
+          next &&
+          prev.userId === next.userId &&
+          prev.displayName === next.displayName &&
+          prev.email === next.email
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    });
+
+    // Another tab signed in/out or rotated tokens.
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SESSION_STORAGE_KEY || e.key === null) {
+        adoptSession(readStoredSession());
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   const setSession = useCallback((data: AuthResponse) => {
-    const next: AuthState = {
-      userId: data.userId,
-      email: data.email,
-      displayName: data.displayName,
-      accessToken: data.accessToken,
-      expiresAtUtc: data.expiresAtUtc,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    setAuth(next);
+    saveSession(data);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setAuth(null);
+    const refreshToken = getSession()?.refreshToken;
+    clearSession();
+    if (refreshToken) void api.logout(refreshToken);
   }, []);
 
   const value = useMemo(
